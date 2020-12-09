@@ -157,7 +157,6 @@ class MLP(Layer): # Multi Layer Perceptron
         N = len(y_hat) # Number of samples
         B = len(y_hat[0]) # Number of bits in a chord
 
-        loss_average = 0
         for j in range(N) :
             error_number_of_notes = 0
             error_classes_of_notes = 0
@@ -166,21 +165,68 @@ class MLP(Layer): # Multi Layer Perceptron
                 if i in [0,1,2] : # Indexes of the bits of number of notes in a chord
                     error_number_of_notes += (y_hat[j][i] - y[j][i])**2
                 elif i in [3,10,17,24,31] :
-                    error_octaves_of_notes += (y_hat[j][i] - y[j][i])**2 + (y_hat[j][i+1] - y[j][i+1])**2 + (y_hat[j][i+2] - y[j][i+2])**2 # Indexes of the bits of the classes
+                    error_octaves_of_notes += (   (y_hat[j][i] - y[j][i])**2
+                                                + (y_hat[j][i+1] - y[j][i+1])**2
+                                                + (y_hat[j][i+2] - y[j][i+2])**2  
+                                              ) # With indexes of the bits of the classes
                 elif i in [6,13,20,27,34] :
-                    error_classes_of_notes += (y_hat[j][i] - y[j][i])**2 + (y_hat[j][i+1] - y[j][i+1])**2 + (y_hat[j][i+2] - y[j][i+2])**2 + (y_hat[j][i+3] - y[j][i+3])**2 # Indexes of the bits of the octaves
+                    error_classes_of_notes += (   (y_hat[j][i] - y[j][i])**2 
+                                                + (y_hat[j][i+1] - y[j][i+1])**2 
+                                                + (y_hat[j][i+2] - y[j][i+2])**2
+                                                + (y_hat[j][i+3] - y[j][i+3])**2 
+                                              ) # With indexes of the bits of the octaves
 
             #M_1 = 1000 # Error on the number of chords is very higly punished
             #M_2 = 100 # Error on the classes of notes is higly punished
             #M_3 = 1 # Error on the octave is relatively acceptable, if the octaves are next to each other it's ok
 
-            loss = self.M_1 * error_number_of_notes + self.M_2 * error_classes_of_notes + self.M_3 * error_octaves_of_notes
-            loss_average += loss/N
+            loss = (  0.5 * self.M_1 * error_number_of_notes 
+                    + 0.5 * self.M_2 * error_classes_of_notes 
+                    + 0.5 * self.M_3 * error_octaves_of_notes
+                   )
+            loss_average = loss/N
 
         return loss_average
         ################ END OF YOUR CODE HERE ##############
-        
     
+
+    def grad_loss(self, y_hat, y) :
+        '''
+        Compute the DERIVATIVE loss between y_hat and y! they can be 1D or 2D arrays!
+        
+        INPUTS:
+        - y_hat : numpy array of size NxC ,N number of samples,  C number of bits. It contains the estimated values of y
+        - y : numpy array of size NxC ,N number of samples, C corresponding to the correct bits for that sample
+        
+        OUTPUTS:
+        - grad_L : MSE loss
+        '''
+        
+        # compute the mean square loss between y_hat and y
+        
+        ################# YOUR CODE HERE ####################
+        N = len(y_hat) # Number of samples
+        B = len(y_hat[0]) # Number of bits in a chord
+        grad_loss_average = [[]] # Grad vector
+
+        for j in range(N) :
+            for i in range(B) :
+                if i in [0,1,2] : # Indexes of the bits of number of notes in a chord
+                    bit_error_number_of_notes = (y_hat[j][i] - y[i])
+                    grad_loss_average[0].append( self.M_1 * bit_error_number_of_notes / N)
+                elif i in [3,10,17,24,31] : # Indexes of the bits of the octaves
+                    for k in range(3) : # Number of bits of the octaves
+                        bit_error_octaves = (y_hat[j][i + k] - y[i + k])
+                        grad_loss_average[0].append( self.M_2 * bit_error_octaves / N)
+                elif i in [6,13,20,27,34] :
+                    for k in range(4) : # Number of bits of the classes
+                        bit_error_classes = (y_hat[j][i + k] - y[i + k])
+                        grad_loss_average[0].append( self.M_2 * bit_error_classes / N)
+
+        return np.array(grad_loss_average)
+        ################ END OF YOUR CODE HERE ##############
+
+
     def accuracy(self, y_hat,y) :
         '''
         Compute the accuracy between y_hat and y
@@ -262,7 +308,7 @@ class MLP(Layer): # Multi Layer Perceptron
         a_L = y_hat # = self.layer[L-1].a
         
         ### Computing the cost function derivative relative to a_L
-        grad_L_da_L = a_L - y # we derive a norm function
+        grad_L_da_L = self.grad_loss(a_L, y) # we derive a norm function
         
         ### Retrieving the vector d_sigmoid(z_L)
         d_sig_z_L = self.d_sigmoid(self.layer[L-1].z)
