@@ -132,14 +132,14 @@ class MLP(Layer): # Multi Layer Perceptron
             self.layer[i].a = a 
             z=a # The weighted input of the next layer is the output of the current layer
             
-        y_hat = self.layer[L-1].z # The last output is y_hat 
+        y_hat = self.layer[L-1].a # The last output is y_hat 
         
         ################ END OF YOUR CODE HERE ##############
 
         return y_hat
 
     
-    def loss(self, y_hat, y) :
+    def OLD_loss(self, y_hat, y) :
         '''
         Compute the loss between y_hat and y! they can be 1D or 2D arrays!
         
@@ -157,6 +157,7 @@ class MLP(Layer): # Multi Layer Perceptron
         N = len(y_hat) # Number of samples
         B = len(y_hat[0]) # Number of bits in a chord
 
+        loss = 0
         for j in range(N) :
             error_number_of_notes = 0
             error_classes_of_notes = 0
@@ -180,15 +181,43 @@ class MLP(Layer): # Multi Layer Perceptron
             #M_2 = 100 # Error on the classes of notes is higly punished
             #M_3 = 1 # Error on the octave is relatively acceptable, if the octaves are next to each other it's ok
 
-            loss = (  0.5 * self.M_1 * error_number_of_notes 
-                    + 0.5 * self.M_2 * error_classes_of_notes 
-                    + 0.5 * self.M_3 * error_octaves_of_notes
-                   )
-            loss_average = loss/N
+            loss_sample = (  0.5 * self.M_1 * error_number_of_notes 
+                + 0.5 * self.M_2 * error_classes_of_notes 
+                + 0.5 * self.M_3 * error_octaves_of_notes
+                )
+            loss += loss_sample
+        loss_average = loss/N
 
         return loss_average
         ################ END OF YOUR CODE HERE ##############
     
+    def loss(self, y_hat, y) :
+        '''
+        Compute the loss between y_hat and y! they can be 1D or 2D arrays!
+        
+        INPUTS:
+        - y_hat : numpy array of size NxC ,N number of samples,  C number of bits. It contains the estimated values of y
+        - y : numpy array of size NxC ,N number of samples, C corresponding to the correct bits for that sample
+        
+        OUTPUTS:
+        - L : MSE loss
+        '''
+        
+        # compute the mean square loss between y_hat and y
+        
+        ################# YOUR CODE HERE ####################
+        N = len(y_hat) # Number of samples
+        B = len(y_hat[0]) # Number of bits in a chord
+
+        loss = 0
+        for j in range(N) :
+            for i in range(B) :
+                    loss += (y_hat[j][i] - y[j][i])**2
+     
+        loss_average = loss/N
+
+        return loss_average
+        ################ END OF YOUR CODE HERE ##############
 
     def grad_loss(self, y_hat, y) :
         '''
@@ -245,14 +274,14 @@ class MLP(Layer): # Multi Layer Perceptron
         correct_samples = 0 # Number of correct samples initialised to 0 
         for n in range(N) : # We iterate for each samples
             # We check with a boolean correct_bits if each bit is correctly predicted
-            correct_bits = True
-            for c in range(C) :
-                if y_hat[n][c] >= 0.5 and y[n][c] == 0 :
-                    correct_bits = False
-                elif y_hat[n][c] < 0.5 and y[n][c] == 1 :
-                    correct_bits = False
+            #correct_bits = True
+            #for c in range(C) :
+            #    if y_hat[n][c] >= 0.5 and y[n][c] == 0 :
+            #        correct_bits = False
+            #    elif y_hat[n][c] < 0.5 and y[n][c] == 1 :
+            #        correct_bits = False
             # Therefore , correct_bits is True if every predicted bits is > 0.5 or < 0.5 respectively with the correct bits being 1 or 0
-            if correct_bits :
+            if np.argmax(y_hat[n]) == np.argmax(y[n]):
                 correct_samples += 1 # We count every correct samples
         
         acc = correct_samples / N # Accuracy
@@ -308,7 +337,7 @@ class MLP(Layer): # Multi Layer Perceptron
         a_L = y_hat # = self.layer[L-1].a
         
         ### Computing the cost function derivative relative to a_L
-        grad_L_da_L = self.grad_loss(a_L, y) # we derive a norm function
+        grad_L_da_L = a_L - y # we derive a norm function
         
         ### Retrieving the vector d_sigmoid(z_L)
         d_sig_z_L = self.d_sigmoid(self.layer[L-1].z)
