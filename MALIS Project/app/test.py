@@ -29,9 +29,10 @@ file_input = '/Users/aydinabiar/Desktop/MALIS Project/mozart_samples/mid/lacrimo
 output_path = '/Users/aydinabiar/Desktop/MALIS Project/results/mozart_predicted_mediocre_10notes.mid'
 
 ############### IMPORTANT - Specify the weights of each error ####################
-M_1 = 0 # Error on the number of notes
-M_2 = 1 # Error on the classes of the notes
-M_3 = 1 # ERror on the octaves of the notes
+NNlist = [45,20,5]
+#M_1 = 100 # Error on the number of notes
+#M_2 = 10 # Error on the classes of the notes
+#M_3 = 1 # ERror on the octaves of the notes
 
 
 ########## This is a test algorithm using piano only ##########
@@ -66,8 +67,8 @@ def read_midi(file):
             
             # Chord
             elif isinstance(element, mu.chord.Chord):
-                chord_notes = element.notes # List of the notes in the chord
-                chords.append(chord_notes)
+                #chord_notes = element.notes # List of the notes in the chord
+                chords.append(element)
             
     return chords, midi
 
@@ -79,7 +80,7 @@ chords, initial_stream = read_midi(file_input)
 #initial_stream.show()
 
 # Convert a list of note to a list of 38 bits
-def convert_chord_to_bits(chord) :
+def OLD_convert_chord_to_bits(chord) :
     
     bits = []
 
@@ -88,8 +89,8 @@ def convert_chord_to_bits(chord) :
         chord_tuple = (chord, )
 
     # It is a chord, which is a list of Notes
-    elif isinstance(chord, tuple) : 
-        chord_tuple = chord
+    elif isinstance(chord, mu.chord.Chord) : 
+        chord_tuple = chord.notes[:5]
     
     # It is a rest, which is an empty list
     elif isinstance(chord, mu.note.Rest):
@@ -101,7 +102,7 @@ def convert_chord_to_bits(chord) :
 
     # To simplify, we only consider chords of 5 notes or less, so we cut chords who are too large
     if len(chord_tuple) > 5 :
-        return convert_chord_to_bits(chord[:5])
+        return convert_chord_to_bits(chord.notes[:5])
 
     else :
         # Converting the number of notes in the chord in bits
@@ -134,6 +135,76 @@ def convert_chord_to_bits(chord) :
 
         return bits
 
+# Convert a list of note (= chord) to a list of 5 bits corresponding to its number of notes
+def convert_chord_to_bits(chord) :
+    
+
+    # It is a "chord" of only one note, which is simply... a note
+    if isinstance(chord, mu.note.Note) : 
+        chord_tuple = (chord, )
+
+    # It is a chord, which is a list of Notes
+    elif isinstance(chord, mu.chord.Chord) : 
+        chord_tuple = chord.notes[:5]
+    
+    # It is a rest, which is an empty list
+    elif isinstance(chord, mu.note.Rest):
+        return [0,0,0,0,0]
+
+    else :
+        print('ERROR IN CONVERSION')
+        return []
+
+    # To simplify, we only consider chords of 5 notes or less, so we cut chords who are too large
+    if len(chord_tuple) > 5 :
+        return convert_chord_to_bits(chord.notes[:5])
+
+    else :
+        # Converting the number of notes in the chord in bits
+        number_of_notes = len(chord_tuple)
+        bits = [0,0,0,0,0]
+        bits[number_of_notes - 1] = 1
+        return bits
+
+# Convert a list of note (chord) to a list of ranks
+def convert_chord_to_ranks(chord) :
+
+    ranks = []
+
+    # It is a "chord" of only one note, which is simply... a note
+    if isinstance(chord, mu.note.Note) : 
+        chord_tuple = (chord, )
+
+    # If it's a chord of multiple notes
+    # To simplify, we only consider chords of 5 notes or less, so we cut chords who are too large
+    elif isinstance(chord, mu.chord.Chord) :
+        chord_tuple = chord.notes[:5]
+    
+    # It is a rest, which is an empty list
+    elif isinstance(chord, mu.note.Rest):
+        return 5*[0]
+
+    else :
+        print('ERROR IN CONVERSION')
+        return ranks
+
+    if len(chord_tuple) > 5 :
+        return convert_chord_to_ranks(chord[:5])
+
+    else :
+        # Iterate through the notes in the chord
+        for chord in chord_tuple :
+            octave = chord.octave             
+            class_note = chord.pitch.pitchClass
+            rank = class_note + 12*(octave-1)
+            ranks.append(rank)
+
+        # Converting the NULL NOTES to rank = 0
+        number_of_NULL_NOTES = 5 - len(chord_tuple)
+        for i in range(number_of_NULL_NOTES) :
+            ranks.append(0)
+
+        return ranks
 
 # Make training and testing data from the chords
 # Input data is 9 consecutive chords so a vector of 9*38 = 342 bits
@@ -148,37 +219,40 @@ def make_samples(chords) :
     x_test = []
     y_test = []
 
+
     # Iterate through each sample
     for i in range(number_of_samples) :
 
         # Sample is 9 consecutive chords
         sample_chords = chords[i : i + 9]
         
-        # Input vector x whose elements will be the 342 bits representing the sample above
-        sample_bits = []
+        # Input vector x whose elements will be the 5*9 = 45 ranks representing the sample above
+        sample_ranks = []
 
-        # Converting each chord in the sample into 38 bits then append it to the input vector x
+        # Converting each chord in the sample into the 5 ranks of its notes and then append them to the input vector x
         for chord in sample_chords :
             # Convert
-            bits = convert_chord_to_bits(chord)
+            ranks = convert_chord_to_ranks(chord)
             # Append
-            for bit in bits :
-                sample_bits.append(bit)
+            for rank in ranks :
+                sample_ranks.append(rank)
 
         # 10th consecutive chord of the sample
         next_chord = chords[i + 9]
+
         # Ouput vector y whose elements are the 38 bits representing the 10th consecutive chord of the sample above
         bits_next_chord = convert_chord_to_bits(next_chord)
 
         # Deciding randomly if the sample + output will be in the training or testing data. We pick p so that ~80% are in training
         p = random.random() 
         if p <0.80 :
-            x_train.append(sample_bits)
+            x_train.append(sample_ranks)
             y_train.append(bits_next_chord)
 
         else :
-            x_test.append(sample_bits)
+            x_test.append(sample_ranks)
             y_test.append(bits_next_chord)
+
 
     return np.array(x_train), np.array(y_train), np.array(x_test), np.array(y_test)
 
@@ -200,8 +274,15 @@ from NeuralNetwork import MLP
 from pathlib import Path
 import pickle
 
+# Neural Network (NN) parameters
+epochs=150
+learning_rate=0.01
+
 # To differientate Neural Network with different cost parameters
-pickle_name = str(M_1) + "_" + str(M_2) + "_" + str(M_3)
+#pickle_name = str(M_1) + "_" + str(M_2) + "_" + str(M_3)
+pickle_name = ''
+for layer in NNlist :
+    pickle_name += str(layer) + '_'
 # Path to save and load the Neural Network
 pickle_path = Path("/Users/aydinabiar/Desktop/MALIS Project/app/pickles/"+ pickle_name + '.pk')
 if pickle_path.is_file(): # File exists
@@ -209,11 +290,9 @@ if pickle_path.is_file(): # File exists
     with open(pickle_path, 'rb') as fi:
         NN1 = pickle.load(fi)
 
+
 # If it's the first time we make that Neural Network
 else :
-    # Neural Network (NN) parameters
-    epochs=50
-    learning_rate=0.01
     # Print advancement True or False, every k steps
     verbose=True
     print_every_k=10
@@ -222,45 +301,48 @@ else :
     # 342 is the dimension of the input vector x. 
     # 38 is the dimension of the output vector y.
     # Rest is the dimension of the hidden layers
-    NN1 = MLP([342, 10, 10, 10, 38])
+    NN1 = MLP(NNlist)
 
     print('TRAINING')
     # Weights of the errors in the loss function
-    NN1.M_1 = M_1 # Error weight on the number of notes
-    NN1.M_2 = M_2 # Error weight on the classes
-    NN1.M_3 = M_3 # Error weight on the octaves
+    #NN1.M_1 = M_1 # Error weight on the number of notes
+    #NN1.M_2 = M_2 # Error weight on the classes
+    #NN1.M_3 = M_3 # Error weight on the octaves
     # Training
     NN1.training(x_train,y_train,learning_rate,epochs,verbose,print_every_k)
-    # Compute the training loss and accuracy after having completed the training
-    y_hat=NN1.forward(x_train)
-    print('final : loss = %.3e , accuracy = %.2f %%'%(NN1.loss(y_hat,y_train),100*NN1.accuracy(y_hat,y_train)))
-
-    # Test
-    print('\nTEST')
-    y_hat=NN1.forward(x_test)
-    print('loss = %.3e , accuracy = %.2f %%\n'%(NN1.loss(y_hat,y_test),100*NN1.accuracy(y_hat,y_test)))
 
     # Open and save the Neural Netork in a pickle file
     with open(pickle_path, 'wb') as fi:
         # dump your data into the file
         pickle.dump(NN1, fi)
 
+# Compute the training loss and accuracy after having completed the training
+y_hat=NN1.forward(x_train)
+print('final : loss = %.3e , accuracy = %.2f %%'%(NN1.loss(y_hat,y_train),100*NN1.accuracy(y_hat,y_train)))
+
+# Test
+print('\nTEST')
+y_hat=NN1.forward(x_test)
+print('loss = %.3e , accuracy = %.2f %%\n'%(NN1.loss(y_hat,y_test),100*NN1.accuracy(y_hat,y_test)))
+
+    
+
 ### To plot the loss and accuracies over time
 
-#plt.plot(list(range(epochs)),NN1.losses,c='r',marker='o',ls='--')
-#plt.title("Training Loss")
-#plt.xlabel("epochs")
-#plt.ylabel("loss value")
-#plt.show()
+plt.plot(list(range(epochs)),NN1.losses,c='r',marker='o',ls='--')
+plt.title("Training Loss")
+plt.xlabel("epochs")
+plt.ylabel("loss value")
+plt.show()
 
-#plt.plot(list(range(epochs)),NN1.accuracies,c='g',marker='o',ls='--');
-#plt.title("Training accuracy")
-#plt.xlabel("epochs")
-#plt.ylabel("accuracy")
-#plt.show()
+plt.plot(list(range(epochs)),NN1.accuracies,c='g',marker='o',ls='--');
+plt.title("Training accuracy")
+plt.xlabel("epochs")
+plt.ylabel("accuracy")
+plt.show()
 
 
-
+""" 
 # Smooth the output vector of the Neural Network by giving only 0 or 1 values on its elements (0.999 => 1 or 0.001 ==> 0 etc)
 def clean(dirty_bits) :
     clean_bits = []
@@ -325,16 +407,16 @@ def generate_music_stream(start_chords, number_of_notes) :
     last_chords = start_chords
     # Generate a note one by one
     for i in range(number_of_notes) :
-        # Computing the bits of the input vector of the Neural Network
-        last_chords_bits_list = [[]]
+        # Computing the ranks of the input vector of the Neural Network
+        last_chords_ranks_list = [[]]
         for chord in last_chords :
-            bits = convert_chord_to_bits(chord)
-            for bit in bits :
-                last_chords_bits_list[0].append(bit)
-        last_chord_bits = np.array(last_chords_bits_list)
+            ranks = convert_chord_to_ranks(chord)
+            for rank in ranks :
+                last_chords_ranks_list[0].append(rank)
+        last_chord_ranks = np.array(last_chords_ranks_list)
 
         # Forward the input bits into the Neural Network
-        next_chord_bits_dirty = NN1.forward(last_chord_bits)
+        next_chord_bits_dirty = NN1.forward(last_chord_ranks)
 
         # Clean the output vector to get only 1 and 0
         next_chord_bits = clean(next_chord_bits_dirty)
@@ -375,3 +457,4 @@ for chord in predicted_future_stream :
 #final_stream.write('midi', fp=output_path)
 
     
+"""
