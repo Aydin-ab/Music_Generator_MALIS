@@ -9,6 +9,7 @@ import random
 import numpy as np
 
 
+
 # This file is for storing useful functions and methods to manage, convert or compute chords and whatever related to music
 def read_midi(file):
     
@@ -79,16 +80,16 @@ def convert_chord_to_bits(chord) :
             bits.append(bit_int)
 
         # Iterate through the notes in the chord
-        for chord in chord_tuple :
+        for note in chord_tuple :
             # Converting the octave of the note in bits
-            octave = chord.octave 
+            octave = note.octave 
             bits_octave_string = f'{octave:03b}'
             for bit_string in bits_octave_string :
                 bit_int =  int(bit_string)
                 bits.append(bit_int)
 
             # Converting the class of the note in bits
-            class_note = chord.pitch.pitchClass
+            class_note = note.pitch.pitchClass
             bits_class_string = f'{class_note:04b}'
             for bit_string in bits_class_string :
                 bit_int =  int(bit_string)
@@ -96,17 +97,46 @@ def convert_chord_to_bits(chord) :
 
         # Converting the NULL NOTES to bits = 0
         number_of_NULL_NOTES = 35 - 7 * number_of_notes
-        for i in range(number_of_NULL_NOTES) :
+        for _ in range(number_of_NULL_NOTES) :
             bits.append(0)
 
         return bits
 
-
-## For predicting the notes in a chord
-# Convert a list of note (= chord) to a list of 20 bits corresponding to its notes (each 4 bits is a note)
-# Explanation : Notes are among 12 possible note (C, C#, D, etc) which can be coded in 4 bits
 ## For predicting the number of notes
 # Convert a list of note (= chord) to a list of 5 bits corresponding to its number of notes
+def convert_chord_to_bitsNumberNotes(chord) :
+    
+    # It is a "chord" of only one note, which is simply... a note
+    if isinstance(chord, mu.note.Note) : 
+        chord_tuple = (chord, )
+
+    # It is a chord, which is a list of Notes
+    elif isinstance(chord, mu.chord.Chord) : 
+        chord_tuple = chord.notes[:5]
+    
+    # It is a rest, which is an empty list
+    elif isinstance(chord, mu.note.Rest):
+        return 5*[0]
+
+    else :
+        print('ERROR IN CONVERSION')
+        return []
+
+    # To simplify, we only consider chords of 5 notes or less, so we cut chords who are too large
+    if len(chord_tuple) > 5 :
+        return convert_chord_to_bits(chord.notes[:5])
+
+    else :
+        # Converting the number of notes in the chord in bits
+        number_of_notes = len(chord_tuple)
+        bits = [0,0,0,0,0]
+        bits[number_of_notes - 1] = 1
+        return bits
+
+
+## For predicting the notes in a chord
+# Convert a list of note (= chord) to a list of 20 bits corresponding to its notes (each 4 bits is for a note)
+# Explanation : Notes are among 12 possible note (C, C#, D, etc) which can be coded in 4 bits
 def convert_chord_to_bitsNotes(chord) :
     
     bits = []
@@ -146,16 +176,19 @@ def convert_chord_to_bitsNotes(chord) :
         # Converting the NULL NOTES to bits = 0 so that the length of the vectors are consistently equal to 20
         number_of_notes = len(chord_tuple)
         number_of_NULL_NOTES = 20 - 4 * number_of_notes
-        for i in range(number_of_NULL_NOTES) :
+        for _ in range(number_of_NULL_NOTES) :
             bits.append(0)
 
         return bits
 
 
-## For predicting the number of notes
-# Convert a list of note (= chord) to a list of 5 bits corresponding to its number of notes
-def convert_chord_to_bitsNumberNotes(chord) :
+## For predicting the octaves in a chord
+# Convert a list of note (= chord) to a list of 15 bits corresponding to its octaves (each 3 bits is for a note)
+# Explanation : Notes are inside 8 possible octaves (it is the range of a common piano) which can be coded in 3 bits
+def convert_chord_to_bitsOctaves(chord) :
     
+    bits = []
+
     # It is a "chord" of only one note, which is simply... a note
     if isinstance(chord, mu.note.Note) : 
         chord_tuple = (chord, )
@@ -166,7 +199,7 @@ def convert_chord_to_bitsNumberNotes(chord) :
     
     # It is a rest, which is an empty list
     elif isinstance(chord, mu.note.Rest):
-        return 5*[0]
+        return 15*[0]
 
     else :
         print('ERROR IN CONVERSION')
@@ -177,14 +210,30 @@ def convert_chord_to_bitsNumberNotes(chord) :
         return convert_chord_to_bits(chord.notes[:5])
 
     else :
-        # Converting the number of notes in the chord in bits
+
+        # Iterate through the notes in the chord
+        for note in chord_tuple :
+
+            # Converting the octave of the note in bits
+            octave = note.octave 
+            bits_octave_string = f'{octave:03b}'
+            for bit_string in bits_octave_string :
+                bit_int =  int(bit_string)
+                bits.append(bit_int)
+        
+        # Converting the NULL NOTES to bits = 0 so that the length of the vectors are consistently equal to 20
         number_of_notes = len(chord_tuple)
-        bits = [0,0,0,0,0]
-        bits[number_of_notes - 1] = 1
+        number_of_NULL_NOTES = 15 - 3 * number_of_notes
+        for _ in range(number_of_NULL_NOTES) :
+            bits.append(0)
+
         return bits
 
 
-# Convert a list of note (chord) to a list of ranks
+
+
+# A rank is the order of a note in the musical cycle : C = 1, C# = 2, D = 3 etc
+# Convert a list of note (chord) to a list of ranks. This is to create inputs vector
 def convert_chord_to_ranks(chord) :
 
     ranks = []
@@ -219,7 +268,7 @@ def convert_chord_to_ranks(chord) :
 
         # Converting the NULL NOTES to rank = 0
         number_of_NULL_NOTES = 5 - len(chord_tuple)
-        for i in range(number_of_NULL_NOTES) :
+        for _ in range(number_of_NULL_NOTES) :
             ranks.append(0)
 
         return ranks
@@ -229,7 +278,7 @@ def convert_chord_to_ranks(chord) :
 # Make training and testing data from the chords
 # Input data is 9 consecutive chords so a vector of 9*5 = 45 ranks number between 1 and 88 (the 88 notes of the piano)
 # Output data is the predicted property of the 10th chord so either a vector of 5 bits (Number of notes), 20 bits (Notes) or 15 bits (Octaves)
-def make_samples(chords, prediction) :
+def make_samples(chords, feature) :
 
     number_of_samples = len(chords) - 9
 
@@ -262,13 +311,15 @@ def make_samples(chords, prediction) :
 
         ## Compuation of the output
         # Depend on what we want to predict : Numver of Notes, Notes, or Octaves ?
-        if prediction == "NN" :
+        if feature == "NN" :
             # Ouput vector y whose elements are the 5 bits representing the number of notes in the 10th consecutive chord of the sample above
             bits_next_chord = convert_chord_to_bitsNumberNotes(next_chord)
-        elif prediction == "N" :
+        elif feature == "N" :
             # Ouput vector y whose elements are the 20 bits representing the notes in the 10th consecutive chord of the sample above
             bits_next_chord = convert_chord_to_bitsNotes(next_chord)
-
+        elif feature == "O" :
+            # Ouput vector y whose elements are the 15 bits representing the octaves in the 10th consecutive chord of the sample above
+            bits_next_chord = convert_chord_to_bitsOctaves(next_chord)
         # Deciding randomly if the sample + output will be in the training or testing data. We pick p so that ~80% are in training
         p = random.random() 
         if p <0.80 :
@@ -282,6 +333,73 @@ def make_samples(chords, prediction) :
 
     return np.array(x_train), np.array(y_train), np.array(x_test), np.array(y_test)
 
+
+### For the SVM only
+# Return the number of notes in a chord
+def get_number_of_notes(chord) :
+    
+
+    # It is a "chord" of only one note, which is simply... a note, return just 1 note
+    if isinstance(chord, mu.note.Note) : 
+        return 1
+
+    # It is a chord, which is a list of Notes, return he number of notes
+    elif isinstance(chord, mu.chord.Chord) : 
+        # Getting the number of notes
+        number_of_notes = len(chord)
+
+        # To simplify, we only consider chords of 5 notes or less, 
+        # so we say large chords are just chord with 5 notes...
+        if number_of_notes >= 5 :
+            return 5
+        else :
+            return number_of_notes
+
+    else :
+        print('ERROR IN CONVERSION')
+        return 
+
+
+### For the SVM only
+# Make training and testing data base from the chords
+# Input data is 9 consecutive chords so a vector of 9*38 = 342 bits
+# Output data is the predicted feature (Numver of Note, Notes or Octaves) of the 10th chord so a vector of 5,20 or 15 bits
+def make_data(chords) :
+
+    number_of_samples = len(chords) - 9
+
+    X = []
+    y = []
+
+
+    # Iterate through each sample
+    for i in range(number_of_samples) :
+
+        # Sample is 9 consecutive chords
+        sample_chords = chords[i : i + 9]
+        
+        # Input vector x whose elements will be the 5*9 = 45 ranks representing the sample above
+        sample_ranks = []
+
+        # Converting each chord in the sample into the 5 ranks of its notes and then append them to the input vector x
+        for chord in sample_chords :
+            # Convert
+            ranks = convert_chord_to_ranks(chord)
+            # Append
+            for rank in ranks :
+                sample_ranks.append(rank)
+
+        # 10th consecutive chord of the sample
+        next_chord = chords[i + 9]
+
+        # Ouput y which is the predicted number of notes in the 10th chord
+        number_of_notes_predicted = get_number_of_notes(next_chord)
+
+        # Adding the sample to the dataset
+        X.append(sample_ranks)
+        y.append(number_of_notes_predicted)
+
+    return np.array(X), np.array(y)
 
 
 '''
