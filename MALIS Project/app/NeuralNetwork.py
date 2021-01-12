@@ -1,12 +1,40 @@
 import numpy as np
 from math import exp
 from scipy.stats import logistic
+import matplotlib.pyplot as plt # For plotting the results
+
 
 class Layer:
-    '''
-    The class Layer contains the parameters of each layer. Its initialization make them all empty
-    '''
+    """
+    A class used to represent a Layer of a Neural Network
+
+    ...
+
+    Attributes
+    ----------
+    W : list
+        the incoming weights
+    b : list
+        the biases
+    a : list
+        the activations
+    z : list
+        the outputs
+    s : list
+        the gradient of the incoming weights
+    d_b : list
+        the gradient of the biases
+    d_a : list 
+        the gradient of the activations
+    d_z : list
+        the gradient of the outputs
+    """
+
+
     def __init__(self):
+        """
+        Initialise all attributes to an empty list
+        """
         self.W=[] # self.W = the incoming weights
         self.b=[] # self.b = the biases
         self.a=[] # self.a = the activations
@@ -16,7 +44,42 @@ class Layer:
         self.d_a=[] # self.d_a = the gradient of the activations
         self.d_z=[] # self.d_z = the gradient of the outputs
 
-class MLP(Layer): # Multi Layer Perceptron
+class MLP(Layer):
+    """
+    A class used to represent a Neural Network
+
+    ...
+
+    Attributes
+    ----------
+    self.layer : Layer
+        a formatted string to print out what the animal says
+    losses : list
+        losses during training (for each epochs)
+    accuracy : list
+        accuracies during training (for each epochs)
+
+
+    Methods
+    -------
+    sigmoid(a)
+        Sigmoid activation function. It can work with single inputs or vectors or matrices.
+    d_sigmoid(a)
+        Derivative of sigmoid activation function. It can work with single inputs or vectors or matrices.
+    forward(x)
+        Forward function. From input layer to output layer. Input can be 1D or 2D.
+    loss(y_hat, y)
+        Compute the loss between y_hat and y! they can be 1D or 2D arrays!
+    accuracy(y_hat, y)
+        Compute the accuracy between y_hat and y
+    backpropagation(x,y,y_hat,learning_rate)
+        Backpropagate the error from last layer to input layer and then update the parameters
+    training(x,y,learning_rate,num_epochs,verbose=False, print_every_k=1)
+        Training your Neural Network
+    plot()
+        plot the training score (when the Neural Network was constructed) and the testing score
+    """
+
 
     def __init__(self, neurons_per_layer):
         '''
@@ -42,6 +105,8 @@ class MLP(Layer): # Multi Layer Perceptron
         - neurons_per_layer : numpy array containing the number of neurons in
             [ input layer, hidden layer1, hidden layer 2, ..., output layer ]
         '''
+
+
         super().__init__()
         
         self.layer={}
@@ -65,18 +130,35 @@ class MLP(Layer): # Multi Layer Perceptron
         self.accuracies=[]
         
     def sigmoid(self, a) :
-        '''
-        Sigmoid activation function. It can work with single inputs or vectors or matrices.
-        '''
+        """ Sigmoid activation function. It can work with single inputs or vectors or matrices.
+
+        Parameters
+        ----------
+        a : float, ndarray of dimension 2 or more
+            Input
+
+        Output
+        ----------
+        sigmoid of a or each of each of its element, keeping the shape of a
+        """
+        
         # logistic.cdf from scipy is used for stability instead of exponential functions
         
         return np.array(logistic.cdf(a)) 
     
     def d_sigmoid(self, a) :
-        '''
-        Derivative of sigmoid activation function. It can work with single inputs or vectors or matrices.
-        Return the sigmoid derivative of a
-        '''
+        """ Sigmoid activation function. It can work with single inputs or vectors or matrices.
+
+        Parameters
+        ----------
+        a : float, ndarray of dimension 2 or more
+            Input
+        
+        Output
+        ----------
+        derivative of the sigmoid of a or each of each of its element, keeping the shape of a
+        """
+
         ################# YOUR CODE HERE ####################
         
         if np.isscalar(a) : # If a is a scalar then we just calculate normally
@@ -98,26 +180,21 @@ class MLP(Layer): # Multi Layer Perceptron
         ################ END OF YOUR CODE HERE ##############
     
     
-    def forward(self, x) :
-        '''
-        Forward function. From input layer to output layer. Input can be 1D or 2D.
-        
-        INPUTS:
-        - x : numpy array of size NxD, where N is the number of samples, D is the number of input dimensions referred as n_input before
-        
-        OUTPUTS:
-        - y_hat : numpy array of size NxC, where C is the number of classes
-        '''
-        
-        '''
-        Forward function. From input layer to output layer. Input can handle 1D or 2D inputs.
+    def forward(self, x) :        
+        """ Forward function. From input layer to output layer. Input can be 1D or 2D.
 
-        INPUTS:
-        - x : numpy array of size NxD, where N is the number of samples, D is the number of input dimensions referred as n_input before
+        Parameters
+        ----------
+        x : numpy array of size NxD
+            Where N is the number of samples, D is the number of input dimensions referred
+        
+        Output
+        ----------
+        y_hat : numpy array of size NxC
+            Where C is the number of classes
+        """
 
-        OUTPUTS:
-        - y_hat : numpy array of size NxC, where C is the number of classes
-        '''
+        
         ################# YOUR CODE HERE ####################
         
         ######### Please note that I am using the notation of the online chapter you gave in the lab2
@@ -139,71 +216,25 @@ class MLP(Layer): # Multi Layer Perceptron
 
         return y_hat
 
-    
-    def OLD_loss(self, y_hat, y) :
-        '''
-        Compute the loss between y_hat and y! they can be 1D or 2D arrays!
-        
-        INPUTS:
-        - y_hat : numpy array of size NxC ,N number of samples,  C number of bits. It contains the estimated values of y
-        - y : numpy array of size NxC ,N number of samples, C corresponding to the correct bits for that sample
-        
-        OUTPUTS:
-        - L : MSE loss
-        '''
-        
-        # compute the mean square loss between y_hat and y
-        
-        ################# YOUR CODE HERE ####################
-        N = len(y_hat) # Number of samples
-        B = len(y_hat[0]) # Number of bits in a chord
 
-        loss = 0
-        for j in range(N) :
-            error_number_of_notes = 0
-            error_classes_of_notes = 0
-            error_octaves_of_notes = 0
-            for i in range(B) :
-                if i in [0,1,2] : # Indexes of the bits of number of notes in a chord
-                    error_number_of_notes += (y_hat[j][i] - y[j][i])**2
-                elif i in [3,10,17,24,31] :
-                    error_octaves_of_notes += (   (y_hat[j][i] - y[j][i])**2
-                                                + (y_hat[j][i+1] - y[j][i+1])**2
-                                                + (y_hat[j][i+2] - y[j][i+2])**2  
-                                              ) # With indexes of the bits of the classes
-                elif i in [6,13,20,27,34] :
-                    error_classes_of_notes += (   (y_hat[j][i] - y[j][i])**2 
-                                                + (y_hat[j][i+1] - y[j][i+1])**2 
-                                                + (y_hat[j][i+2] - y[j][i+2])**2
-                                                + (y_hat[j][i+3] - y[j][i+3])**2 
-                                              ) # With indexes of the bits of the octaves
-
-            #M_1 = 1000 # Error on the number of chords is very higly punished
-            #M_2 = 100 # Error on the classes of notes is higly punished
-            #M_3 = 1 # Error on the octave is relatively acceptable, if the octaves are next to each other it's ok
-
-            loss_sample = (  0.5 * self.M_1 * error_number_of_notes 
-                + 0.5 * self.M_2 * error_classes_of_notes 
-                + 0.5 * self.M_3 * error_octaves_of_notes
-                )
-            loss += loss_sample
-        loss_average = loss/N
-
-        return loss_average
-        ################ END OF YOUR CODE HERE ##############
-    
     def loss(self, y_hat, y) :
-        '''
+        """
         Compute the loss between y_hat and y! they can be 1D or 2D arrays!
         
-        INPUTS:
-        - y_hat : numpy array of size NxC ,N number of samples,  C number of bits. It contains the estimated values of y
-        - y : numpy array of size NxC ,N number of samples, C corresponding to the correct bits for that sample
+        Parameters
+        ----------
+        y_hat : numpy array of size NxC 
+            Where N is the number of samples,  C the number of bits. It contains the estimated values of y
+        y : numpy array of size NxC 
+            Where N is number of samples, C the number of bits. It contains the correct values of the samples
         
-        OUTPUTS:
-        - L : MSE loss
-        '''
+        Output
+        ----------:
+        L : float
+            MSE loss
+        """
         
+
         # compute the mean square loss between y_hat and y
         
         ################# YOUR CODE HERE ####################
@@ -219,55 +250,26 @@ class MLP(Layer): # Multi Layer Perceptron
 
         return loss_average
         ################ END OF YOUR CODE HERE ##############
-
-    def grad_loss(self, y_hat, y) :
-        '''
-        Compute the DERIVATIVE loss between y_hat and y! they can be 1D or 2D arrays!
-        
-        INPUTS:
-        - y_hat : numpy array of size NxC ,N number of samples,  C number of bits. It contains the estimated values of y
-        - y : numpy array of size NxC ,N number of samples, C corresponding to the correct bits for that sample
-        
-        OUTPUTS:
-        - grad_L : MSE loss
-        '''
-        
-        # compute the mean square loss between y_hat and y
-        
-        ################# YOUR CODE HERE ####################
-        N = len(y_hat) # Number of samples
-        B = len(y_hat[0]) # Number of bits in a chord
-        grad_loss_average = [[]] # Grad vector
-
-        for j in range(N) :
-            for i in range(B) :
-                if i in [0,1,2] : # Indexes of the bits of number of notes in a chord
-                    bit_error_number_of_notes = (y_hat[j][i] - y[i])
-                    grad_loss_average[0].append( self.M_1 * bit_error_number_of_notes / N)
-                elif i in [3,10,17,24,31] : # Indexes of the bits of the octaves
-                    for k in range(3) : # Number of bits of the octaves
-                        bit_error_octaves = (y_hat[j][i + k] - y[i + k])
-                        grad_loss_average[0].append( self.M_2 * bit_error_octaves / N)
-                elif i in [6,13,20,27,34] :
-                    for k in range(4) : # Number of bits of the classes
-                        bit_error_classes = (y_hat[j][i + k] - y[i + k])
-                        grad_loss_average[0].append( self.M_2 * bit_error_classes / N)
-
-        return np.array(grad_loss_average)
-        ################ END OF YOUR CODE HERE ##############
-
+ 
 
     def accuracy(self, y_hat,y) :
-        '''
+        """
         Compute the accuracy between y_hat and y
 
-        INPUTS:
-        - y_hat : numpy array of size NxC, C number of bits. It contains the estimated values of y
-        - y : numpy array of size NxC with correct values of y
+        Parameters
+        ----------
+        y_hat : numpy array of size NxC
+            Where N is the number of samples, C is the number of bits. It contains the estimated values of y
+        y : numpy array of size NxC 
+            Where N is the number of samples, C is the number of bits. It contains the correct values of the samples
+        
+        Outputs
+        ----------
+        acc : float
+            the accuracy value between 0 and 1
+        """
 
-        OUTPUTS:
-        - acc : the accuracy value between 0 and 1
-        '''
+
         ################# YOUR CODE HERE ####################
 
         N = len(y) # Number of samples
@@ -295,11 +297,16 @@ class MLP(Layer): # Multi Layer Perceptron
         '''
         Backpropagate the error from last layer to input layer and then update the parameters
 
-        INPUTS:
-        - y_hat : numpy array of size NxC, C number of classes. It contains the estimated values of y
-        -y : numpy array of size NxC with correct values of y
+        Parameters
+        ----------
+        y_hat : numpy array of size NxC
+            Where N is the number of samples, C is the number of classes. It contains the estimated values of y
+        y : numpy array of size NxC 
+            Where N is the number of samples, C is the number of classes. It contains the correct values of the samples
 
-        OUTPUTS: (compute the error at the different levels and for each layer)
+        Outputs
+        ----------
+        (compute the error at the different levels and for each layer and update them)
         - d_a
         - d_z
         - delta_L
@@ -307,6 +314,8 @@ class MLP(Layer): # Multi Layer Perceptron
         - d_W
         - d_b
         '''
+
+
         # compute gradients
 
             ################# YOUR CODE HERE ####################
@@ -428,20 +437,27 @@ class MLP(Layer): # Multi Layer Perceptron
   
         
     def training(self,x,y,learning_rate,num_epochs,verbose=False, print_every_k=1) :
-        '''
+        """
         Training your network
         
-        INPUTS:
-        - x : numpy array of size NxD, D number of features of your input
-        - y : numpy array of size NxC, C number of classes, with correct values of target
-        - learning_rate : a numpy scalar containing your learning rate
-        - num_epochs : a numpy scalar representing the number of epochs with which train your networks
-        - verbose : a boolean False by default, if True print the training loss and training accuracy values
+        Parameters
+        ----------
+        x : numpy array of size NxD
+            where N is the number of samples, D is the number of features of your input
+        y : numpy array of size NxC
+            where N is the number of samples, C is the number of classes, with correct values of target
+        learning_rate : float
+            a numpy scalar containing your learning rate
+        num_epochs : float
+            a numpy scalar representing the number of epochs with which train your networks
+        verbose : boolean = False by default
+            a boolean False by default, if True print the training loss and training accuracy values
                     if False only store them
-        - print_every_k : a numpy scalar equal 1 by default, if verbose is True print the result every print_every_k epochs
+        print_every_k int = 1 by default
+            a numpy scalar equal 1 by default, if verbose is True print the result every print_every_k epochs
+        """
 
-        OUTPUTS: /
-        '''
+
         accuracy=[]
         loss=[]
 
@@ -455,7 +471,6 @@ class MLP(Layer): # Multi Layer Perceptron
             
             # sample by sample forward and backward through the network using stochastic gradient descent (SGD)
             for sample in range(x.shape[0]) :
-                test = x_shuffled[sample,:]
                 y_hat=self.forward(x_shuffled[sample,:])
                 self.backpropagation(x_shuffled[sample,:].reshape(1,x.shape[1]),y_shuffled[sample,:],y_hat,learning_rate)
 
@@ -474,3 +489,28 @@ class MLP(Layer): # Multi Layer Perceptron
         self.losses=loss
         self.accuracies=accuracy
             
+    
+    def plot(self, epochs, learning_rate) :
+        """
+        Training your network
+        
+        Parameters
+        ----------
+        epochs : int
+            a numpy scalar representing the number of epochs with which train your networks
+        learning_rate : float
+            a numpy scalar containing your learning rate
+        """
+
+
+        plt.plot(list(range(epochs)),self.losses,c='r',marker='o',ls='--')
+        plt.title("Training Loss")
+        plt.xlabel("epochs")
+        plt.ylabel("loss value")
+        plt.show()
+
+        plt.plot(list(range(epochs)),self.accuracies,c='g',marker='o',ls='--')
+        plt.title("Training accuracy")
+        plt.xlabel("epochs")
+        plt.ylabel("accuracy")
+        plt.show()   
