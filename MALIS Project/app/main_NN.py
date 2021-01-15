@@ -76,6 +76,7 @@ if pickle_path.is_file(): # If File exists
     # Load Neural Network back to memory 
     with open(pickle_path, 'rb') as fi:
         NN1 = pickle.load(fi)
+        NN1.feature = feature
 
 else : # Or if it's the first time we make that Neural Network
     # Print advancement True or False, every k steps
@@ -84,7 +85,8 @@ else : # Or if it's the first time we make that Neural Network
 
     # Initialization of the NN.
     NN1 = MLP(NNlist)
-
+    NN1.feature = feature
+        
     print('TRAINING')
 
     # Training
